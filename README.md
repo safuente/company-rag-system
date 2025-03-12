@@ -1,5 +1,5 @@
-# company-rag-system
-Show information of employees, contracts, products and company using RAG and GPT-4 mini model
+# Company RAG System
+Show information of employees, contracts, products and company using RAG (company-info folder) and GPT-4 mini model
 
 ## Run code
 Create a virtual env and install all the packages in requirements.txt:
