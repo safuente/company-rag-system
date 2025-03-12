@@ -3,7 +3,7 @@ import glob
 import streamlit as st
 from dotenv import load_dotenv
 import openai
-
+import re  # Added regex to sanitize unwanted responses
 
 class CompanyRagSystem:
     def __init__(self):
@@ -15,8 +15,8 @@ class CompanyRagSystem:
         self.context = {}  # Stores the company-related documents
         self.system_message = (
             "You are an expert in answering questions about Insurellm, the Insurance Tech company. "
-            "Categorize user queries as related to 'company', 'products', 'contracts', or 'employees'. "
-            "Retrieve and use only relevant context from the stored knowledge. If no relevant information is available, say so."
+            "Retrieve and use only relevant context from the stored knowledge. "
+            "If no relevant information is available, say so."
         )
         self.load_data()
 
@@ -37,27 +37,28 @@ class CompanyRagSystem:
                     self.context[(category, name)] = f.read()  # Store content in a dictionary
 
     def classify_message(self, message):
-        """Classify a user's message into one of the predefined categories: 'company', 'products', 'contracts', or 'employees'."""
+        """Classify the user's message into one of the predefined categories."""
         classification_prompt = (
-            "You will classify the user’s message into one of these categories: "
-            "'company', 'products', 'contracts', 'employees'. If it does not fit any, return 'unknown'.\n\n"
-            "Examples:\n"
-            "1. 'What products does the company offer?' -> products\n"
-            "2. 'Show me the list of employees' -> employees\n"
-            "3. 'Give me details about the company's vision' -> company\n"
-            "4. 'What contracts are available?' -> contracts\n"
-            "5. 'How many employees does the company have?' -> employees\n"
-            "6. 'What is the history of the company?' -> company\n"
-            "7. 'List the products the company sells' -> products\n"
-            "8. 'Provide contract details' -> contracts\n\n"
-            f"User's message: {message}\n\nCategory:"
+            "Classify the following user query into one of these categories: "
+            "'company', 'products', 'contracts', 'employees'.\n"
+            "- Only respond with one word: 'company', 'products', 'contracts', or 'employees'.\n"
+            "- Do NOT include any additional text, explanations, or formatting.\n"
+            "- If it doesn't fit any category, respond with 'unknown'.\n\n"
+            f"User's query: {message}\n\nCategory:"
         )
 
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "system", "content": classification_prompt}]
         )
-        return response.choices[0].message.content.strip().lower()
+
+        category = response.choices[0].message.content.strip().lower()
+
+        # Ensure the response contains only a valid category
+        valid_categories = {"company", "products", "contracts", "employees", "unknown"}
+        category = category if category in valid_categories else "unknown"
+
+        return category
 
     def get_relevant_context(self, message):
         """Retrieve relevant company-related information based on the classified category."""
@@ -74,8 +75,7 @@ class CompanyRagSystem:
         """Attach relevant context to the user's message to improve answer accuracy."""
         relevant_context = self.get_relevant_context(message)
         if relevant_context:
-            message += "\n\nRelevant context:\n\n"
-            message += "\n\n".join(relevant_context)
+            message += "\n\n" + "\n\n".join(relevant_context)  # Attach context without mentioning the category
         return message
 
     def chat(self, message, history):
